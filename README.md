@@ -11,6 +11,7 @@
 ### Distill methodologies from books, long-form videos, and podcasts into callable AI Skills
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+[![Version: 2.5.0](https://img.shields.io/badge/Version-2.5.0-8b5cf6.svg)](./CHANGELOG.md)
 [![Method: RIA--TV++](https://img.shields.io/badge/Method-RIA--TV++-2ea44f.svg)](./SKILL.md)
 [![Platform: OpenClaw](https://img.shields.io/badge/Platform-OpenClaw-1677ff.svg)](https://github.com/openclaw/openclaw)
 [![Platform: Claude Code](https://img.shields.io/badge/Platform-Claude%20Code-f97316.svg)](https://code.claude.com/)
@@ -26,21 +27,36 @@
 
 The website provides visual Skill Pack browsing, a beginner-friendly usage guide, Skill detail pages, and a contribution submission entry. This GitHub repository remains the sole source for cangjie-skill code, methodology, and templates; the website provides presentation, navigation, and usage guidance.
 
+## What's New in v2.5.0
+
+- **Capability Bundle as the single source of truth**: extraction produces stable capability cards and metadata before any installable output is compiled.
+- **Two deterministic delivery modes**: compile one router-style Skill (`single`) or a compact pack with a router plus promoted standalone Skills (`pack`).
+- **A unified local toolchain**: `scripts/cangjie.py` now covers diagnostics, compilation, output replanning, incremental updates, repair, rollback, evaluation, and benchmarking.
+- **Safer evolution**: content-addressed preprocessing, source diffs, impact analysis, transactional patches, edit detection, snapshots, and rollback are included.
+- **Registry v2 and website support**: output mode and capability counts are visible without breaking existing Registry v1 entries.
+
+See the [v2.5.0 release notes](./docs/releases/v2.5.0.md) and [changelog](./CHANGELOG.md) for the complete scope and migration notes.
+
+**2026-09-13 refresh (still v2.5.0):** task-first validation now retains complete procedures and formulas explained in a single source location. Output scoring counts missing runs and checks numeric values/units; compiled Skills can carry declared scripts and text templates. [Download the refreshed generic Skill ZIP](https://github.com/kangarooking/cangjie-skill/releases/download/v2.5.0/cangjie-skill-2.5.0.zip) · [SHA256](https://github.com/kangarooking/cangjie-skill/releases/download/v2.5.0/cangjie-skill-2.5.0.zip.sha256). Extract it and install the complete `cangjie-skill/` directory. Existing users must download the refreshed package; check `BUILD_INFO.json` for the source commit and refresh date. The original tag is unchanged, so GitHub's automatic source archives do not contain this refresh.
+
 ## DeepSeek Harness Plugin
 
 cangjie-skill also provides a standalone installation package for DeepSeek Harness. The adapter layer is bundled in the Release package, so no platform-specific wrapper files are added to this repository.
 
-After installing DeepSeek Harness, run:
+After installing DeepSeek Harness, download the v2.5.0 package and checksum, verify it, then install from the local tarball:
 
 ```bash
 mkdir -p ~/.dsh/packages
-curl -fL "https://github.com/kangarooking/cangjie-skill/releases/download/v2.0.0/dsh-cangjie-skill-2.0.0.tgz" \
-  -o ~/.dsh/packages/dsh-cangjie-skill-2.0.0.tgz
-dsh plugin --profile web add ~/.dsh/packages/dsh-cangjie-skill-2.0.0.tgz
+curl -fL "https://github.com/kangarooking/cangjie-skill/releases/download/v2.5.0/dsh-cangjie-skill-2.5.0.tgz" \
+  -o ~/.dsh/packages/dsh-cangjie-skill-2.5.0.tgz
+curl -fL "https://github.com/kangarooking/cangjie-skill/releases/download/v2.5.0/dsh-cangjie-skill-2.5.0.tgz.sha256" \
+  -o ~/.dsh/packages/dsh-cangjie-skill-2.5.0.tgz.sha256
+(cd ~/.dsh/packages && shasum -a 256 -c dsh-cangjie-skill-2.5.0.tgz.sha256)
+dsh plugin --profile web add ~/.dsh/packages/dsh-cangjie-skill-2.5.0.tgz
 dsh web
 ```
 
-[Download the DeepSeek Harness plugin (for Cangjie Skill v2.0.0)](https://github.com/kangarooking/cangjie-skill/releases/download/v2.0.0/dsh-cangjie-skill-2.0.0.tgz)
+[Download the DeepSeek Harness plugin (for Cangjie Skill v2.5.0)](https://github.com/kangarooking/cangjie-skill/releases/download/v2.5.0/dsh-cangjie-skill-2.5.0.tgz) · [SHA256 checksum](https://github.com/kangarooking/cangjie-skill/releases/download/v2.5.0/dsh-cangjie-skill-2.5.0.tgz.sha256)
 
 After starting a new task, you can say:
 
@@ -69,15 +85,17 @@ For video content, we recommend using the [video-downloader](https://github.com/
 
 ## How It Works
 
-cangjie-skill uses the **RIA-TV++** pipeline to transform source texts—including books, video transcripts, podcast transcripts, and interview notes—into a set of structured skills. The process has seven stages:
+cangjie-skill uses the **RIA-TV++** pipeline to transform source texts—including books, video transcripts, podcast transcripts, and interview notes—into a reusable Capability Bundle, then compiles that source into installable skills. The process has seven stages:
+
+> **Script dependencies**: the deterministic scripts under `scripts/` require **Python 3.10+** and **PyYAML** (`python3 -m pip install pyyaml`). `python3 scripts/cangjie.py doctor` runs a self-check and works even when PyYAML is missing. Optional: `tiktoken`, `jsonschema`.
 
 1. **Whole-Content Comprehension (Adler Analysis)** — Structural, interpretive, critical, and applicability analysis using Mortimer Adler's method, producing `BOOK_OVERVIEW.md`
 2. **Parallel Extraction** — Five specialized extractors (frameworks, principles, cases, counter-examples, glossary) run simultaneously to pull candidate units from the source text
-3. **Triple Verification** — Each candidate must pass three checks: at least 2 independent supporting passages (cross-domain), ability to answer a novel question (predictive power), and non-commonsense uniqueness. Pass rate is typically 25-50%
-4. **RIA++ Construction** — Verified content is structured into six dimensions: R (original quote) / I (own-words reconstruction) / A1 (book cases) / A2 (future trigger scenarios) / E (executable steps) / B (boundaries & blind spots)
-5. **Zettelkasten Linking** — Dependency, contrast, and composition relationships between skills are identified, producing `INDEX.md` with a reference graph
+3. **Triple Verification + Promotion Gate** — Check source sufficiency, executability, and task utility by candidate type. A complete procedure or formula explained once can qualify; repetition or author originality is not mandatory. References and unresolved candidates remain auditable, and standalone entrypoints are decided separately
+4. **RIA++ Capability Construction** — Verified content is structured into R / I / A1 / A2 / E / B capability cards inside `.cangjie/capabilities/`
+5. **Zettelkasten Linking** — Dependencies, contrasts, and compositions are encoded in the Bundle's capability graph and shared glossary
 6. **Pressure Testing** — Test prompts including bait questions (and cross-skill confusion tests) are designed for each skill; failures go back for full reconstruction
-7. **Delivery** — A reader-facing `DIGEST.md` long-form digest is generated (skip the book, read the essence), and tested skills are installed into the Claude Code / Cursor skills directory so they can actually be invoked
+7. **Deterministic Compilation and Delivery** — The same Bundle compiles to `single` or compact `pack`, alongside a reader-facing `DIGEST.md`, validation results, and installable artifacts
 
 The name RIA-TV++ breaks down as:
 - **RIA**: From Zhao Zhou's bookmark method (Reading / Interpretation / Appropriation)
